@@ -180,12 +180,25 @@ async function loginUsingOAuthClient() {
 async function handleOAuthResult() {
 	try {
 		console.log("=== Starting OAuth Result Handler ===");
+		console.log("Current URL:", window.location.href);
+		console.log("URL params:", window.location.search);
+		
 		let magic = magicConstructor();
 		console.log("Magic instance created");
 		
-		// Get OAuth result
-		const result = await magic.oauth.getRedirectResult();
-		console.log("OAuth result:", result);
+		// Get OAuth result with better error handling
+		let result;
+		try {
+			result = await magic.oauth.getRedirectResult();
+			console.log("OAuth result:", result);
+		} catch (oauthError) {
+			console.error("OAuth getRedirectResult error:", oauthError);
+			// If it's a parsing error, likely stale or missing OAuth state
+			if (oauthError.message && (oauthError.message.includes('verifier') || oauthError.message.includes('JSON.parse'))) {
+				throw new Error("OAuth session expired or invalid. Please try logging in again.");
+			}
+			throw oauthError;
+		}
 		
 		// Extract wallet address - simplified approach like OpenCRAVAT
 		const walletAddress = result?.magic?.userMetadata?.publicAddress;
