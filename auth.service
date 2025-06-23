@@ -1,0 +1,31 @@
+[Unit]
+Description=GenoBank Unified Authentication Service
+After=network.target redis.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/Genobank_APIs/auth-service
+Environment="NODE_ENV=production"
+Environment="PATH=/usr/bin:/usr/local/bin"
+ExecStart=/home/ubuntu/.nvm/versions/node/v24.2.0/bin/node src/server.js
+Restart=always
+RestartSec=10
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=genobank-auth
+
+[Install]
+WantedBy=multi-user.target

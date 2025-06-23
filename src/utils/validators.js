@@ -1,0 +1,75 @@
+const Joi = require('joi');
+
+const validateLoginRequest = (data) => {
+  const schema = Joi.object({
+    method: Joi.string()
+      .valid('metamask', 'biowallet', 'magic', 'email', 'google', 'walletconnect', 'wallet')
+      .required(),
+    signature: Joi.string().when('method', {
+      is: Joi.valid('metamask', 'biowallet', 'walletconnect'),
+      then: Joi.required(),
+      otherwise: Joi.optional()
+    }),
+    address: Joi.string().when('method', {
+      is: Joi.valid('metamask', 'biowallet', 'walletconnect'),
+      then: Joi.required(),
+      otherwise: Joi.optional()
+    }),
+    email: Joi.string().email().optional(),
+    token: Joi.string().when('method', {
+      is: 'google',
+      then: Joi.required(),
+      otherwise: Joi.optional()
+    }),
+    client_id: Joi.string().optional(), // Made optional since frontend doesn't send it
+    redirect_uri: Joi.string().uri().optional(),
+    state: Joi.string().optional(),
+    message: Joi.string().optional(), // Allow message field from frontend
+    name: Joi.string().optional(), // Optional name field
+    picture: Joi.string().optional() // Optional picture field
+  });
+
+  return schema.validate(data);
+};
+
+const validateUpdateProfile = (data) => {
+  const schema = Joi.object({
+    name: Joi.string().min(1).max(100).optional(),
+    picture: Joi.string().uri().optional(),
+    metadata: Joi.object().optional()
+  });
+
+  return schema.validate(data);
+};
+
+const validateLinkAuthMethod = (data) => {
+  const schema = Joi.object({
+    method: Joi.string()
+      .valid('metamask', 'biowallet', 'magic', 'email', 'google', 'walletconnect', 'wallet')
+      .required(),
+    signature: Joi.string().when('method', {
+      is: Joi.valid('metamask', 'biowallet', 'walletconnect'),
+      then: Joi.required(),
+      otherwise: Joi.optional()
+    }),
+    address: Joi.string().when('method', {
+      is: Joi.valid('metamask', 'biowallet', 'walletconnect'),
+      then: Joi.required(),
+      otherwise: Joi.optional()
+    }),
+    email: Joi.string().email().optional(),
+    token: Joi.string().when('method', {
+      is: 'google',
+      then: Joi.required(),
+      otherwise: Joi.optional()
+    })
+  });
+
+  return schema.validate(data);
+};
+
+module.exports = {
+  validateLoginRequest,
+  validateUpdateProfile,
+  validateLinkAuthMethod
+};

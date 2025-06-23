@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GenoBank Auth - Processing...</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/css/auth.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="container">
+        <div class="row min-vh-100 align-items-center justify-content-center">
+            <div class="col-12 col-md-8 col-lg-6 col-xl-5">
+                <div class="card shadow-lg border-0 rounded-4">
+                    <div class="card-body p-5 text-center">
+                        <h1 class="display-6 fw-bold text-primary mb-4">
+                            <i class="fas fa-dna me-2"></i>GenoBank Auth
+                        </h1>
+                        
+                        <div class="mb-4">
+                            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                        
+                        <h4 class="mb-3">Processing Authentication...</h4>
+                        <p class="text-muted">Please wait while we complete your Google sign-in.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts - Same as main page -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/3.0.0-rc.5/web3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.2.0/ethers.umd.min.js"></script>
+    
+    <!-- magic libraries -->
+    <script src="https://auth.magic.link/sdk"></script>
+    <script src="https://cdn.jsdelivr.net/npm/magic-sdk/dist/magic.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@magic-ext/oauth/dist/extension.js"></script>
+    
+    <script>
+        // Global configuration
+        window.GENOBANK_APP_API = 'https://genobank.app';
+        window.API_BASE_URL = 'https://auth.genobank.app';
+        window.RPC_NETWORK = 'https://api.avax.network/ext/bc/C/rpc';
+        window.CHAIN_ID = 43114;
+        window.MAGIC_API_KEY = 'pk_live_5F9630468805C3A0';
+    </script>
+    
+    <script src="/js/login.js"></script>
+    
+    <script>
+        // Handle OAuth callback on page load
+        window.addEventListener('load', async () => {
+            console.log('OAuth callback page loaded');
+            console.log('URL params:', window.location.search);
+            
+            try {
+                await handleOAuthResult();
+                // If successful, the function will redirect
+            } catch (error) {
+                console.error('OAuth callback error:', error);
+                // Show error message
+                document.querySelector('.card-body').innerHTML = `
+                    <h1 class="display-6 fw-bold text-danger mb-4">
+                        <i class="fas fa-exclamation-circle me-2"></i>Authentication Failed
+                    </h1>
+                    <p class="mb-4">${error.message}</p>
+                    <a href="/" class="btn btn-primary">Back to Login</a>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>

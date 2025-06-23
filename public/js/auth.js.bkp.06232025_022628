@@ -1,0 +1,383 @@
+// GenoBank Auth - Unified Authentication JavaScript
+
+// Configuration
+const API_BASE_URL = 'https://auth.genobank.app';
+const GENOBANK_API_URL = 'https://genobank.app';
+const MAGIC_API_KEY = 'pk_live_5F9630468805C3A0';
+
+// Get URL parameters
+const urlParams = new URLSearchParams(window.location.search);
+const returnUrl = urlParams.get('returnUrl') || urlParams.get('return_url');
+const appName = urlParams.get('app') || urlParams.get('appName');
+const autoLogin = urlParams.get('autoLogin');
+
+// DOM Elements - will be initialized after DOM loads
+let walletBtn, googleBtn, walletConnectBtn, successAlert, errorAlert, successMessage, errorMessage, appNameDisplay;
+
+// Magic SDK instance
+let magic;
+
+// Initialize event listeners after DOM loads
+function initializeEventListeners() {
+  // Get DOM elements
+  walletBtn = document.getElementById('walletBtn');
+  googleBtn = document.getElementById('googleBtn');
+  walletConnectBtn = document.getElementById('walletConnectBtn');
+  successAlert = document.getElementById('successAlert');
+  errorAlert = document.getElementById('errorAlert');
+  successMessage = document.getElementById('successMessage');
+  errorMessage = document.getElementById('errorMessage');
+  appNameDisplay = document.getElementById('appName');
+  
+  // Set app name if provided
+  if (appName && appNameDisplay) {
+    appNameDisplay.textContent = `Login to ${appName}`;
+  }
+  
+  // Browser wallet login
+  if (walletBtn) {
+    walletBtn.addEventListener('click', async () => {
+      if (!window.ethereum) {
+        showError('Please install MetaMask or another Web3 wallet');
+        return;
+      }
+      
+      showLoading(walletBtn, true);
+      
+      try {
+        // Request account access
+        const accounts = await window.ethereum.request({ 
+          method: 'eth_requestAccounts' 
+        });
+        
+        if (!accounts || accounts.length === 0) {
+          throw new Error('No accounts found');
+        }
+        
+        const address = accounts[0];
+        const message = "I want to proceed";
+        
+        // Request signature
+        const signature = await window.ethereum.request({
+          method: 'personal_sign',
+          params: [message, address]
+        });
+        
+        // Authenticate with backend
+        const response = await fetch(`${API_BASE_URL}/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            method: 'metamask',
+            address: address,
+            signature: signature,
+            message: message
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          handleAuthSuccess(data);
+        } else {
+          showError(data.error || 'Authentication failed');
+        }
+      } catch (error) {
+        console.error('Wallet login error:', error);
+        if (error.code === 4001) {
+          showError('Signature request rejected');
+        } else {
+          showError('Wallet connection failed');
+        }
+      } finally {
+        showLoading(walletBtn, false);
+      }
+    });
+  }
+  
+  // Google OAuth login
+  if (googleBtn) {
+    googleBtn.addEventListener('click', async () => {
+      showLoading(googleBtn, true);
+      
+      try {
+        // For now, show a message that Google OAuth is being set up
+        showError('Google OAuth is currently being configured. Please use Browser Wallet or WalletConnect.');
+        showLoading(googleBtn, false);
+        
+        // Alternative: redirect to a popup-based flow if you want to implement it later
+        // const popup = window.open('/google-oauth.html', 'Google Login', 'width=500,height=600');
+      } catch (error) {
+        console.error('Google OAuth error:', error);
+        showError('Google login is temporarily unavailable');
+        showLoading(googleBtn, false);
+      }
+    });
+  }
+  
+  // WalletConnect login
+  if (walletConnectBtn) {
+    walletConnectBtn.addEventListener('click', async () => {
+      showLoading(walletConnectBtn, true);
+      
+      try {
+        // Use the connectAndSign function from walletConnectConnection.js
+        if (window.connectAndSign) {
+          await window.connectAndSign();
+          
+          // Check if auth was successful
+          setTimeout(() => {
+            const wallet = localStorage.getItem('user_wallet');
+            const signature = localStorage.getItem('user_sign');
+            
+            if (wallet && signature) {
+              // Send to auth service
+              fetch(`${API_BASE_URL}/auth/login`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                  method: 'walletconnect',
+                  address: wallet,
+                  signature: signature
+                })
+              })
+              .then(response => response.json())
+              .then(data => {
+                if (data.success) {
+                  handleAuthSuccess(data);
+                } else {
+                  showError(data.error || 'Authentication failed');
+                }
+              })
+              .catch(error => {
+                console.error('WalletConnect auth error:', error);
+                showError('Authentication failed');
+              });
+            }
+          }, 1000);
+        } else {
+          showError('WalletConnect not initialized');
+        }
+      } catch (error) {
+        console.error('WalletConnect error:', error);
+        showError('WalletConnect connection failed');
+      } finally {
+        showLoading(walletConnectBtn, false);
+      }
+    });
+  }
+}
+
+// Initialize Magic SDK (placeholder for future implementation)
+function initializeMagic() {
+  // Magic SDK initialization disabled for now
+  // Google OAuth will be implemented in a future update
+  console.log('Magic SDK initialization skipped - Google OAuth coming soon');
+}
+
+// Helper Functions
+function showLoading(button, loading) {
+  if (!button) return;
+  const spinner = button.querySelector('.spinner-border');
+  if (loading) {
+    button.disabled = true;
+    if (spinner) spinner.classList.remove('d-none');
+  } else {
+    button.disabled = false;
+    if (spinner) spinner.classList.add('d-none');
+  }
+}
+
+function showSuccess(message) {
+  if (successMessage && successAlert && errorAlert) {
+    successMessage.textContent = message;
+    successAlert.classList.remove('d-none');
+    errorAlert.classList.add('d-none');
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      successAlert.classList.add('d-none');
+    }, 5000);
+  }
+}
+
+function showError(message) {
+  if (errorMessage && errorAlert && successAlert) {
+    errorMessage.textContent = message;
+    errorAlert.classList.remove('d-none');
+    successAlert.classList.add('d-none');
+    
+    // Add shake animation
+    errorAlert.classList.add('shake');
+    setTimeout(() => {
+      errorAlert.classList.remove('shake');
+    }, 500);
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      errorAlert.classList.add('d-none');
+    }, 5000);
+  }
+}
+
+function handleAuthSuccess(data) {
+  showSuccess('Authentication successful! Redirecting...');
+  
+  // Store auth data if needed
+  if (data.user) {
+    localStorage.setItem('auth_user', JSON.stringify(data.user));
+  }
+  
+  // Redirect after short delay
+  setTimeout(() => {
+    if (returnUrl) {
+      // Validate return URL to prevent open redirect
+      try {
+        const url = new URL(returnUrl, window.location.origin);
+        if (url.hostname.endsWith('.genobank.app') || 
+            url.hostname.endsWith('.nvlope.io') ||
+            url.hostname === 'localhost') {
+          window.location.href = returnUrl;
+        } else {
+          window.location.href = 'https://genobank.app/dashboard';
+        }
+      } catch (e) {
+        window.location.href = 'https://genobank.app/dashboard';
+      }
+    } else {
+      window.location.href = 'https://genobank.app/dashboard';
+    }
+  }, 1000);
+}
+
+async function checkAuthStatus() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/session`, {
+      credentials: 'include'
+    });
+    
+    const data = await response.json();
+    
+    if (data.authenticated) {
+      // If already authenticated and has a returnUrl, redirect
+      if (returnUrl) {
+        handleAuthSuccess(data);
+      } else {
+        // Already authenticated but no returnUrl - show logged in state
+        showSuccess(`You are logged in as ${data.user.email || data.user.address}`);
+        // Update UI to show logout option
+        updateUIForAuthenticatedUser(data.user);
+      }
+    }
+  } catch (error) {
+    console.error('Auth status check error:', error);
+  }
+}
+
+function updateUIForAuthenticatedUser(user) {
+  // Hide login buttons
+  document.querySelectorAll('.auth-btn').forEach(btn => btn.style.display = 'none');
+  
+  // Show user info and logout button
+  const authContainer = document.querySelector('.card-body');
+  if (authContainer) {
+    const userInfo = document.createElement('div');
+    userInfo.className = 'text-center';
+    userInfo.innerHTML = `
+      <h5 class="mb-3">Welcome back!</h5>
+      <p class="mb-4">You are logged in as: <strong>${user.email || user.address}</strong></p>
+      <button class="btn btn-danger" onclick="logout()">Logout</button>
+      ${returnUrl ? `<a href="${returnUrl}" class="btn btn-primary ms-2">Continue to App</a>` : ''}
+    `;
+    authContainer.appendChild(userInfo);
+  }
+}
+
+// Make logout available globally
+window.logout = async function logout() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      // Clear local storage
+      localStorage.removeItem('auth_user');
+      localStorage.removeItem('user_wallet');
+      localStorage.removeItem('user_sign');
+      localStorage.removeItem('login_method');
+      
+      // Redirect to login
+      window.location.href = '/';
+    } else {
+      showError(data.error || 'Logout failed');
+    }
+  } catch (error) {
+    console.error('Logout error:', error);
+    showError('Logout failed');
+  }
+}
+
+// Auto-login handler
+if (autoLogin) {
+  switch (autoLogin.toLowerCase()) {
+    case 'google':
+      // Wait for page load then click Google button
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          if (googleBtn) googleBtn.click();
+        }, 500);
+      });
+      break;
+    case 'metamask':
+    case 'wallet':
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          if (walletBtn) walletBtn.click();
+        }, 500);
+      });
+      break;
+    case 'walletconnect':
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          if (walletConnectBtn) walletConnectBtn.click();
+        }, 500);
+      });
+      break;
+  }
+}
+
+// Initialize everything when page loads
+window.addEventListener('load', () => {
+  // Initialize Magic SDK
+  initializeMagic();
+  
+  // Initialize event listeners
+  initializeEventListeners();
+  
+  // Check authentication status
+  checkAuthStatus();
+});
+
+// Handle OAuth callback messages
+window.addEventListener('message', (event) => {
+  // Validate origin
+  if (!event.origin.includes('.genobank.app') && event.origin !== window.location.origin) {
+    return;
+  }
+  
+  if (event.data.type === 'auth-success') {
+    handleAuthSuccess(event.data);
+  } else if (event.data.type === 'auth-error') {
+    showError(event.data.error || 'Authentication failed');
+  }
+});

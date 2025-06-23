@@ -1,0 +1,489 @@
+// GenoBank Auth - Unified Authentication JavaScript
+
+// Configuration
+const API_BASE_URL = 'https://auth.genobank.app';
+const GENOBANK_API_URL = 'https://genobank.app';
+const MAGIC_API_KEY = 'pk_live_5F9630468805C3A0';
+
+// Get URL parameters
+const urlParams = new URLSearchParams(window.location.search);
+const returnUrl = urlParams.get('returnUrl') || urlParams.get('return_url');
+const appName = urlParams.get('app') || urlParams.get('appName');
+const autoLogin = urlParams.get('autoLogin');
+
+// DOM Elements
+const emailInput = document.getElementById('emailInput');
+const emailLoginBtn = document.getElementById('emailLoginBtn');
+const walletBtn = document.getElementById('walletBtn');
+const googleBtn = document.getElementById('googleBtn');
+const walletConnectBtn = document.getElementById('walletConnectBtn');
+const successAlert = document.getElementById('successAlert');
+const errorAlert = document.getElementById('errorAlert');
+const successMessage = document.getElementById('successMessage');
+const errorMessage = document.getElementById('errorMessage');
+const appNameDisplay = document.getElementById('appName');
+
+// Set app name if provided
+if (appName) {
+  appNameDisplay.textContent = `Login to ${appName}`;
+}
+
+// Email validation
+emailInput.addEventListener('input', (e) => {
+  const email = e.target.value;
+  const isValid = validateEmail(email);
+  
+  if (email) {
+    emailInput.classList.toggle('is-invalid', !isValid);
+    emailLoginBtn.disabled = !isValid;
+  } else {
+    emailInput.classList.remove('is-invalid');
+    emailLoginBtn.disabled = true;
+  }
+});
+
+// Email login
+emailLoginBtn.addEventListener('click', async () => {
+  const email = emailInput.value;
+  
+  if (!validateEmail(email)) {
+    showError('Please enter a valid email address');
+    return;
+  }
+  
+  showLoading(emailLoginBtn, true);
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        method: 'email',
+        email: email
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      showSuccess('Email sent! Please check your inbox.');
+      emailInput.value = '';
+      emailLoginBtn.disabled = true;
+    } else {
+      showError(data.error || 'Failed to send login email');
+    }
+  } catch (error) {
+    console.error('Email login error:', error);
+    showError('Network error. Please try again.');
+  } finally {
+    showLoading(emailLoginBtn, false);
+  }
+});
+
+// Browser wallet login
+walletBtn.addEventListener('click', async () => {
+  if (!window.ethereum) {
+    showError('Please install MetaMask or another Web3 wallet');
+    return;
+  }
+  
+  showLoading(walletBtn, true);
+  
+  try {
+    // Request account access
+    const accounts = await window.ethereum.request({ 
+      method: 'eth_requestAccounts' 
+    });
+    
+    if (!accounts || accounts.length === 0) {
+      throw new Error('No accounts found');
+    }
+    
+    const address = accounts[0];
+    const message = "I want to proceed";
+    
+    // Request signature
+    const signature = await window.ethereum.request({
+      method: 'personal_sign',
+      params: [message, address]
+    });
+    
+    // Authenticate with backend
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        method: 'metamask',
+        address: address,
+        signature: signature,
+        message: message
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      handleAuthSuccess(data);
+    } else {
+      showError(data.error || 'Authentication failed');
+    }
+  } catch (error) {
+    console.error('Wallet login error:', error);
+    if (error.code === 4001) {
+      showError('Signature request rejected');
+    } else {
+      showError('Wallet connection failed');
+    }
+  } finally {
+    showLoading(walletBtn, false);
+  }
+});
+
+// Google OAuth login
+googleBtn.addEventListener('click', () => {
+  showLoading(googleBtn, true);
+  
+  // Construct OAuth URL
+  const state = btoa(JSON.stringify({
+    returnUrl: returnUrl,
+    timestamp: Date.now()
+  }));
+  
+  const oauthUrl = `${API_BASE_URL}/auth/oauth/google?state=${encodeURIComponent(state)}`;
+  
+  // Open OAuth popup
+  const width = 500;
+  const height = 600;
+  const left = (screen.width - width) / 2;
+  const top = (screen.height - height) / 2;
+  
+  const popup = window.open(
+    oauthUrl,
+    'Google Login',
+    `width=${width},height=${height},left=${left},top=${top}`
+  );
+  
+  // Listen for OAuth callback
+  const interval = setInterval(() => {
+    try {
+      if (popup.closed) {
+        clearInterval(interval);
+        showLoading(googleBtn, false);
+        checkAuthStatus();
+      }
+    } catch (e) {
+      // Cross-origin error expected
+    }
+  }, 500);
+});
+
+// WalletConnect login
+walletConnectBtn.addEventListener('click', async () => {
+  showLoading(walletConnectBtn, true);
+  
+  try {
+    // Show QR code modal
+    const modal = createQRModal();
+    document.body.appendChild(modal);
+    
+    // Initialize WalletConnect via popup
+    const response = await fetch(`${API_BASE_URL}/auth/walletconnect/init`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include'
+    });
+    
+    const data = await response.json();
+    
+    if (data.success && data.uri) {
+      // Generate QR code
+      const qrContainer = modal.querySelector('#qrCode');
+      const qr = new QRCode(qrContainer, {
+        text: data.uri,
+        width: 256,
+        height: 256,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
+      });
+      
+      // Poll for connection status
+      const sessionId = data.sessionId;
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusResponse = await fetch(`${API_BASE_URL}/auth/walletconnect/status/${sessionId}`, {
+            credentials: 'include'
+          });
+          
+          const statusData = await statusResponse.json();
+          
+          if (statusData.connected) {
+            clearInterval(pollInterval);
+            modal.remove();
+            handleAuthSuccess(statusData);
+          } else if (statusData.error) {
+            clearInterval(pollInterval);
+            modal.remove();
+            showError(statusData.error);
+          }
+        } catch (error) {
+          console.error('WalletConnect status error:', error);
+        }
+      }, 2000);
+      
+      // Close handler
+      modal.querySelector('.qr-close-btn').addEventListener('click', () => {
+        clearInterval(pollInterval);
+        modal.remove();
+        showLoading(walletConnectBtn, false);
+      });
+    } else {
+      showError('Failed to initialize WalletConnect');
+    }
+  } catch (error) {
+    console.error('WalletConnect error:', error);
+    showError('WalletConnect initialization failed');
+  } finally {
+    showLoading(walletConnectBtn, false);
+  }
+});
+
+// Helper Functions
+function validateEmail(email) {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
+}
+
+function showLoading(button, loading) {
+  const spinner = button.querySelector('.spinner-border');
+  if (loading) {
+    button.disabled = true;
+    spinner.classList.remove('d-none');
+  } else {
+    button.disabled = false;
+    spinner.classList.add('d-none');
+  }
+}
+
+function showSuccess(message) {
+  successMessage.textContent = message;
+  successAlert.classList.remove('d-none');
+  errorAlert.classList.add('d-none');
+  
+  // Auto-hide after 5 seconds
+  setTimeout(() => {
+    successAlert.classList.add('d-none');
+  }, 5000);
+}
+
+function showError(message) {
+  errorMessage.textContent = message;
+  errorAlert.classList.remove('d-none');
+  successAlert.classList.add('d-none');
+  
+  // Add shake animation
+  errorAlert.classList.add('shake');
+  setTimeout(() => {
+    errorAlert.classList.remove('shake');
+  }, 500);
+  
+  // Auto-hide after 5 seconds
+  setTimeout(() => {
+    errorAlert.classList.add('d-none');
+  }, 5000);
+}
+
+function handleAuthSuccess(data) {
+  showSuccess('Authentication successful! Redirecting...');
+  
+  // Store auth data if needed
+  if (data.user) {
+    localStorage.setItem('auth_user', JSON.stringify(data.user));
+  }
+  
+  // Redirect after short delay
+  setTimeout(() => {
+    if (returnUrl) {
+      // Validate return URL to prevent open redirect
+      try {
+        const url = new URL(returnUrl, window.location.origin);
+        if (url.hostname.endsWith('.genobank.app') || 
+            url.hostname.endsWith('.nvlope.io') ||
+            url.hostname === 'localhost') {
+          window.location.href = returnUrl;
+        } else {
+          window.location.href = 'https://genobank.app/dashboard';
+        }
+      } catch (e) {
+        window.location.href = 'https://genobank.app/dashboard';
+      }
+    } else {
+      window.location.href = 'https://genobank.app/dashboard';
+    }
+  }, 1000);
+}
+
+async function checkAuthStatus() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/session`, {
+      credentials: 'include'
+    });
+    
+    const data = await response.json();
+    
+    if (data.authenticated) {
+      // If already authenticated and has a returnUrl, redirect
+      if (returnUrl) {
+        handleAuthSuccess(data);
+      } else {
+        // Already authenticated but no returnUrl - show logged in state
+        showSuccess(`You are logged in as ${data.user.email || data.user.address}`);
+        // Update UI to show logout option
+        updateUIForAuthenticatedUser(data.user);
+      }
+    }
+  } catch (error) {
+    console.error('Auth status check error:', error);
+  }
+}
+
+function updateUIForAuthenticatedUser(user) {
+  // Hide login buttons
+  document.querySelectorAll('.auth-btn').forEach(btn => btn.style.display = 'none');
+  emailInput.style.display = 'none';
+  emailLoginBtn.style.display = 'none';
+  
+  // Show user info and logout button
+  const authContainer = document.querySelector('.card-body');
+  const userInfo = document.createElement('div');
+  userInfo.className = 'text-center';
+  userInfo.innerHTML = `
+    <h5 class="mb-3">Welcome back!</h5>
+    <p class="mb-4">You are logged in as: <strong>${user.email || user.address}</strong></p>
+    <button class="btn btn-danger" onclick="logout()">Logout</button>
+    ${returnUrl ? `<a href="${returnUrl}" class="btn btn-primary ms-2">Continue to App</a>` : ''}
+  `;
+  authContainer.appendChild(userInfo);
+}
+
+async function logout() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+    
+    if (response.ok) {
+      window.location.reload();
+    }
+  } catch (error) {
+    console.error('Logout error:', error);
+    showError('Logout failed. Please try again.');
+  }
+}
+
+function createQRModal() {
+  const modal = document.createElement('div');
+  modal.className = 'qr-modal';
+  modal.innerHTML = `
+    <button class="qr-close-btn">&times;</button>
+    <div class="qr-modal-content">
+      <h3 class="mb-3">Scan with WalletConnect</h3>
+      <div class="qr-code-container">
+        <div id="qrCode"></div>
+      </div>
+      <p class="text-muted">
+        Scan this QR code with your WalletConnect-compatible wallet
+      </p>
+    </div>
+  `;
+  return modal;
+}
+
+// Auto-login handler
+if (autoLogin) {
+  switch (autoLogin.toLowerCase()) {
+    case 'google':
+      googleBtn.click();
+      break;
+    case 'metamask':
+    case 'wallet':
+      walletBtn.click();
+      break;
+    case 'walletconnect':
+      walletConnectBtn.click();
+      break;
+    case 'email':
+      emailInput.focus();
+      break;
+  }
+}
+
+// Check if already authenticated
+window.addEventListener('load', () => {
+  checkAuthStatus();
+});
+
+// Handle OAuth callback
+if (window.location.pathname === '/oauth-callback.html') {
+  const params = new URLSearchParams(window.location.search);
+  const success = params.get('success') === 'true';
+  const error = params.get('error');
+  
+  if (success) {
+    // Close popup and notify parent
+    if (window.opener) {
+      window.opener.postMessage({ type: 'auth-success' }, '*');
+      window.close();
+    } else {
+      // Redirect if not in popup
+      const state = params.get('state');
+      if (state) {
+        try {
+          const stateData = JSON.parse(atob(state));
+          if (stateData.returnUrl) {
+            window.location.href = stateData.returnUrl;
+          } else {
+            window.location.href = 'https://genobank.app/dashboard';
+          }
+        } catch (e) {
+          window.location.href = 'https://genobank.app/dashboard';
+        }
+      }
+    }
+  } else {
+    // Show error
+    if (window.opener) {
+      window.opener.postMessage({ type: 'auth-error', error: error }, '*');
+      window.close();
+    } else {
+      alert(error || 'Authentication failed');
+      window.location.href = '/';
+    }
+  }
+}
+
+// Listen for OAuth popup messages
+window.addEventListener('message', (event) => {
+  if (event.data.type === 'auth-success') {
+    checkAuthStatus();
+  } else if (event.data.type === 'auth-error') {
+    showError(event.data.error || 'Authentication failed');
+  }
+});
+
+// Prevent form submission on enter
+emailInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter' && !emailLoginBtn.disabled) {
+    e.preventDefault();
+    emailLoginBtn.click();
+  }
+});
