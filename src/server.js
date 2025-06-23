@@ -105,7 +105,8 @@ app.use(helmet({
       fontSrc: ["'self'", "data:", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
-      frameSrc: ["'self'", "https://auth.magic.link", "https://*.magic.link"],
+      frameSrc: ["'self'", "https://auth.magic.link", "https://*.magic.link", "https://verify.walletconnect.com", "https://*.walletconnect.com"],
+      frameAncestors: ["'self'", "https://*.genobank.app"],
     },
   },
   crossOriginEmbedderPolicy: false

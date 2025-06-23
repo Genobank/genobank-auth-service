@@ -183,18 +183,44 @@ async function handleOAuthResult() {
 		console.log("Current URL:", window.location.href);
 		console.log("URL params:", window.location.search);
 		
-		let magic = magicConstructor();
-		console.log("Magic instance created");
+		// Check if we have the required OAuth parameters
+		const urlParams = new URLSearchParams(window.location.search);
+		if (!urlParams.has('magic_credential')) {
+			console.error("Missing magic_credential parameter");
+			throw new Error("Invalid OAuth callback - missing required parameters");
+		}
+		
+		// Create a fresh Magic instance
+		let magic;
+		try {
+			magic = magicConstructor();
+			console.log("Magic instance created");
+		} catch (constructorError) {
+			console.error("Failed to create Magic instance:", constructorError);
+			throw new Error("Failed to initialize authentication service");
+		}
 		
 		// Get OAuth result with better error handling
 		let result;
 		try {
+			// Log storage state before attempting
+			console.log("LocalStorage keys:", Object.keys(localStorage));
+			console.log("SessionStorage keys:", Object.keys(sessionStorage));
+			
 			result = await magic.oauth.getRedirectResult();
 			console.log("OAuth result:", result);
 		} catch (oauthError) {
 			console.error("OAuth getRedirectResult error:", oauthError);
+			console.error("Error stack:", oauthError.stack);
+			
 			// If it's a parsing error, likely stale or missing OAuth state
 			if (oauthError.message && (oauthError.message.includes('verifier') || oauthError.message.includes('JSON.parse'))) {
+				// Try to provide more context
+				console.error("OAuth state issue detected. This usually happens when:");
+				console.error("1. The OAuth flow was initiated from a different domain");
+				console.error("2. Browser storage was cleared during the flow");
+				console.error("3. The OAuth session expired");
+				
 				throw new Error("OAuth session expired or invalid. Please try logging in again.");
 			}
 			throw oauthError;

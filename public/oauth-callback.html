@@ -81,10 +81,12 @@
                 return;
             }
             
-            try {
-                await handleOAuthResult();
-                // If successful, the function will redirect
-            } catch (error) {
+            // Wait a bit to ensure all scripts are loaded
+            setTimeout(async () => {
+                try {
+                    await handleOAuthResult();
+                    // If successful, the function will redirect
+                } catch (error) {
                 console.error('OAuth callback error:', error);
                 
                 // If it's a verifier error, user might need to try again
@@ -111,7 +113,7 @@
                         <a href="/" class="btn btn-primary">Back to Login</a>
                     `;
                 }
-            }
+            }, 500); // Wait 500ms for all scripts to initialize
         });
     </script>
 </body>

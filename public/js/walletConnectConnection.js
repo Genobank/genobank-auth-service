@@ -53,6 +53,13 @@ const subscribeToDisconnect = (account) => {
 
 
 const connectAndSign = async () => {
+  // Store returnUrl in sessionStorage to persist through WalletConnect flow
+  const urlParams = new URLSearchParams(window.location.search);
+  const returnUrl = urlParams.get('returnUrl');
+  if (returnUrl) {
+    sessionStorage.setItem('walletconnect_return_url', returnUrl);
+  }
+  
   // Show loading spinner if button exists
   const walletConnectBtn = document.getElementById('walletConnectBtn');
   const spinner = walletConnectBtn?.querySelector('.spinner-border');
