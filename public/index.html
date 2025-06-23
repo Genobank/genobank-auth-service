@@ -107,6 +107,13 @@
     <script>
         // Check if already authenticated (but only if not coming from OAuth callback)
         window.addEventListener('load', async () => {
+            // If we're not at the root path, redirect to root with params
+            if (window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
+                const params = window.location.search;
+                window.location.href = '/' + params;
+                return;
+            }
+            
             // Don't check session if we're handling OAuth callback
             if (window.location.search.includes('state=') || window.location.search.includes('code=')) {
                 console.log('OAuth callback detected, skipping session check');
@@ -121,8 +128,17 @@
                 if (response.ok) {
                     const data = await response.json();
                     if (data.user && data.user.address) {
-                        // Already authenticated, redirect to dashboard
-                        window.location.href = '/dashboard.html';
+                        // Already authenticated, check for return URL
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const returnUrl = urlParams.get('returnUrl');
+                        
+                        if (returnUrl) {
+                            // Redirect back to calling service
+                            window.location.href = returnUrl;
+                        } else {
+                            // No return URL, go to GenoVault
+                            window.location.href = 'https://genobank.io/consent/biofile/index.html';
+                        }
                     }
                 }
             } catch (error) {

@@ -149,11 +149,19 @@ async function loginUsingOAuthClient() {
 	googleLoader.removeClass('d-none')
 	let magic = magicConstructor();
 	
+	// Store returnUrl in sessionStorage to persist through OAuth flow
+	const urlParams = new URLSearchParams(window.location.search);
+	const returnUrl = urlParams.get('returnUrl');
+	if (returnUrl) {
+		sessionStorage.setItem('oauth_return_url', returnUrl);
+	}
+	
 	// For auth service, always use the fixed redirect URI
 	const fullRedirectURI = 'https://auth.genobank.app/oauth-callback.html';
 	
 	console.log('=== Magic Link OAuth Debug ===');
 	console.log('Full Redirect URI:', fullRedirectURI);
+	console.log('Return URL stored:', returnUrl);
 	console.log('Magic API Key:', window.MAGIC_API_KEY || MAGIC_API_KEY);
 	console.log('Current location:', window.location.href);
 	
@@ -434,16 +442,28 @@ async function sendAuthToService(method) {
         console.log('Auth response:', data);
         
         if (response.ok && data.success) {
-            // Get return URL from query params
+            // Get return URL from query params or sessionStorage (for OAuth flow)
             const urlParams = new URLSearchParams(window.location.search);
-            const returnUrl = urlParams.get('returnUrl');
+            let returnUrl = urlParams.get('returnUrl');
+            
+            // Check sessionStorage for OAuth flow
+            if (!returnUrl && method === 'google') {
+                returnUrl = sessionStorage.getItem('oauth_return_url');
+                sessionStorage.removeItem('oauth_return_url'); // Clean up
+            }
+            
+            // Check sessionStorage for WalletConnect flow
+            if (!returnUrl && method === 'walletconnect') {
+                returnUrl = sessionStorage.getItem('walletconnect_return_url');
+                sessionStorage.removeItem('walletconnect_return_url'); // Clean up
+            }
             
             // Show success message
             showSuccessToast('Authentication successful! Redirecting...');
             
             // Redirect
             setTimeout(() => {
-                window.location.href = returnUrl || '/dashboard.html';
+                window.location.href = returnUrl || 'https://genobank.io/consent/biofile/index.html';
             }, 1000);
         } else {
             // Handle rate limiting specifically
