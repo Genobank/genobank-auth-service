@@ -500,9 +500,14 @@ async function sendAuthToService(method) {
             // Show success message
             showSuccessToast('Authentication successful! Redirecting...');
             
-            // Redirect
+            // Redirect with fromAuth parameter to prevent loops
             setTimeout(() => {
-                window.location.href = returnUrl || 'https://genobank.io/consent/biofile/index.html';
+                if (returnUrl) {
+                    const separator = returnUrl.includes('?') ? '&' : '?';
+                    window.location.href = returnUrl + separator + 'fromAuth=true';
+                } else {
+                    window.location.href = 'https://genobank.io/consent/biofile/index.html';
+                }
             }, 1000);
         } else {
             // Handle rate limiting specifically
