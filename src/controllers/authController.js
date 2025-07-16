@@ -90,7 +90,7 @@ class AuthController {
       });
 
       // Additional cookies for backward compatibility
-      res.cookie('user_sign', signature || '', {
+      res.cookie('user_signature', signature || '', {
         domain: COOKIE_DOMAIN,
         httpOnly: false,
         secure: true,
@@ -150,7 +150,7 @@ class AuthController {
 
       // Clear all cookies
       const cookiesToClear = [
-        'auth_token', 'refresh_token', 'user_sign', 'user_wallet', 
+        'auth_token', 'refresh_token', 'user_signature', 'user_wallet', 
         'magic_token', 'login_method', 'isPermittee', 'email', 'name', 'picture'
       ];
 

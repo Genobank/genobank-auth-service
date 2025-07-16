@@ -133,8 +133,9 @@
                         const returnUrl = urlParams.get('returnUrl');
                         
                         if (returnUrl) {
-                            // Redirect back to calling service
-                            window.location.href = returnUrl;
+                            // Add fromAuth parameter to prevent redirect loops
+                            const separator = returnUrl.includes('?') ? '&' : '?';
+                            window.location.href = returnUrl + separator + 'fromAuth=true';
                         } else {
                             // No return URL, go to GenoVault
                             window.location.href = 'https://genobank.io/consent/biofile/index.html';

@@ -27,7 +27,7 @@ function setAuthCookie(name, value, maxAge = AUTH_COOKIE_CONFIG.maxAge) {
 
 function setAuthData(authData) {
     const {
-        user_sign,
+        user_signature,
         user_wallet,
         magic_token,
         login_method,
@@ -38,7 +38,7 @@ function setAuthData(authData) {
     } = authData;
     
     // Set cookies for cross-domain access
-    if (user_sign) setAuthCookie('user_sign', user_sign);
+    if (user_signature) setAuthCookie('user_signature', user_signature);
     if (user_wallet) setAuthCookie('user_wallet', user_wallet);
     if (magic_token) setAuthCookie('magic_token', magic_token);
     if (login_method) setAuthCookie('login_method', login_method);
@@ -48,7 +48,7 @@ function setAuthData(authData) {
     if (picture) setAuthCookie('picture', picture);
     
     // Also set localStorage for backward compatibility
-    if (user_sign) localStorage.setItem('user_sign', user_sign);
+    if (user_signature) localStorage.setItem('user_signature', user_signature);
     if (user_wallet) localStorage.setItem('user_wallet', user_wallet);
     if (magic_token) localStorage.setItem('magic_token', magic_token);
     if (login_method) localStorage.setItem('login_method', login_method);
@@ -104,7 +104,7 @@ async function startingMetamaskLoginProcess(){
 	
 	// Set both cookies and localStorage
 	setAuthData({
-		user_sign: sign_autentication,
+		user_signature: sign_autentication,
 		user_wallet: wallet,
 		isPermittee: !!isPerm,
 		login_method: 'metamask'
@@ -249,7 +249,7 @@ async function handleOAuthResult() {
 		
 		// Store auth data
 		const authData = {
-			user_sign: real_signature,
+			user_signature: real_signature,
 			user_wallet: walletAddress,
 			isPermittee: !!isPerm,
 			email: result?.oauth?.userInfo?.email,
@@ -417,7 +417,7 @@ async function getValidatePermittee(address) {
 
 async function sendAuthToService(method) {
     const wallet = localStorage.getItem('user_wallet');
-    const signature = localStorage.getItem('user_sign');
+    const signature = localStorage.getItem('user_signature');
     const email = localStorage.getItem('email');
     const name = localStorage.getItem('name');
     const magicToken = localStorage.getItem('magic_token');
@@ -500,9 +500,14 @@ async function sendAuthToService(method) {
             // Show success message
             showSuccessToast('Authentication successful! Redirecting...');
             
-            // Redirect
+            // Redirect with fromAuth parameter to prevent loops
             setTimeout(() => {
-                window.location.href = returnUrl || 'https://genobank.io/consent/biofile/index.html';
+                if (returnUrl) {
+                    const separator = returnUrl.includes('?') ? '&' : '?';
+                    window.location.href = returnUrl + separator + 'fromAuth=true';
+                } else {
+                    window.location.href = 'https://genobank.io/consent/biofile/index.html';
+                }
             }, 1000);
         } else {
             // Handle rate limiting specifically

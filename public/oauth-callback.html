@@ -87,32 +87,34 @@
                     await handleOAuthResult();
                     // If successful, the function will redirect
                 } catch (error) {
-                console.error('OAuth callback error:', error);
-                
-                // If it's a verifier error, user might need to try again
-                if (error.message && error.message.includes('verifier')) {
-                    // Clear any stale OAuth state
-                    sessionStorage.removeItem('oauth_return_url');
-                    localStorage.removeItem('magic_oauth_state');
+                    console.error('OAuth callback error:', error);
                     
-                    // Show user-friendly message
-                    document.querySelector('.card-body').innerHTML = `
-                        <h1 class="display-6 fw-bold text-warning mb-4">
-                            <i class="fas fa-redo me-2"></i>Session Expired
-                        </h1>
-                        <p class="mb-4">Your login session has expired. Please try again.</p>
-                        <a href="/" class="btn btn-primary">Back to Login</a>
-                    `;
-                } else {
-                    // Show generic error
-                    document.querySelector('.card-body').innerHTML = `
-                        <h1 class="display-6 fw-bold text-danger mb-4">
-                            <i class="fas fa-exclamation-circle me-2"></i>Authentication Failed
-                        </h1>
-                        <p class="mb-4">${error.message}</p>
-                        <a href="/" class="btn btn-primary">Back to Login</a>
-                    `;
-                }
+                    // If it's a verifier error, user might need to try again
+                    if (error.message && error.message.includes('verifier')) {
+                        // Clear any stale OAuth state
+                        sessionStorage.removeItem('oauth_return_url');
+                        localStorage.removeItem('magic_oauth_state');
+                        
+                        // Show user-friendly message
+                        document.querySelector('.card-body').innerHTML = `
+                            <h1 class="display-6 fw-bold text-warning mb-4">
+                                <i class="fas fa-redo me-2"></i>Session Expired
+                            </h1>
+                            <p class="mb-4">Your login session has expired. Please try again.</p>
+                            <a href="/" class="btn btn-primary">Back to Login</a>
+                        `;
+                    } else {
+                        // Show generic error
+                        document.querySelector('.card-body').innerHTML = `
+                            <h1 class="display-6 fw-bold text-danger mb-4">
+                                <i class="fas fa-exclamation-circle me-2"></i>Authentication Failed
+                            </h1>
+                            <p class="mb-4">${error.message}</p>
+                            <a href="/" class="btn btn-primary">Back to Login</a>
+                        `;
+                    }
+                }  // Close the else block
+            }  // Close the catch block  
             }, 500); // Wait 500ms for all scripts to initialize
         });
     </script>

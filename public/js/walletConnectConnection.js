@@ -96,7 +96,7 @@ const connectAndSign = async () => {
 
     // Save to localStorage
     localStorage.setItem("user_wallet", account.address);
-    localStorage.setItem("user_sign", signature);
+    localStorage.setItem("user_signature", signature);
     localStorage.setItem("login_method", "walletConnect");
     
     // Hide spinner
@@ -123,7 +123,7 @@ const disconnectWallet = async () => {
 
     // Limpiar el localStorage
     localStorage.removeItem("user_wallet");
-    localStorage.removeItem("user_sign");
+    localStorage.removeItem("user_signature");
     localStorage.removeItem("login_method");
 
     location.reload()
@@ -138,7 +138,7 @@ function onDisconnectWallet() {
   console.log('Wallet desconectada.');
 
   // localStorage.removeItem("user_wallet");
-  // localStorage.removeItem("user_sign");
+  // localStorage.removeItem("user_signature");
   // localStorage.removeItem("login_method");
   localStorage.clear()
 
@@ -174,7 +174,7 @@ async function walletConnectSignMessage (message) {
 function closingPopup() {
   // In auth service, send auth data to backend
   const wallet = localStorage.getItem('user_wallet');
-  const signature = localStorage.getItem('user_sign');
+  const signature = localStorage.getItem('user_signature');
   
   if (wallet && signature && window.API_BASE_URL) {
     console.log('WalletConnect authentication data ready');
